@@ -6,16 +6,13 @@ import discord
 from discord.ext import commands, tasks
 from discord.ext.commands import Context
 from dotenv import load_dotenv
-from functions import ConfigManager, OllamaHandler
+from functions.config import ConfigManager
 
-# Loading Configs
 config = ConfigManager('config.yml')
 
-# Intents 
 intents = discord.Intents.default()
 intents.message_content = True
 
-# Logging Handlers
 class LoggingFormatter(logging.Formatter):
     black = "\x1b[30m"
     red = "\x1b[31m"
@@ -47,24 +44,19 @@ class LoggingFormatter(logging.Formatter):
 logger: logging.Logger = logging.getLogger('discord_bot')
 logger.setLevel(logging.INFO)
 
-# Console handler
+
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(LoggingFormatter())
-# File handler
+
 file_handler = logging.FileHandler(filename="logs/main.log", encoding="utf-8", mode="w")
 file_handler_formatter = logging.Formatter(
     "[{asctime}] [{levelname:<8}] {name}: {message}", "%Y-%m-%d %H:%M:%S", style="{"
 )
 file_handler.setFormatter(file_handler_formatter)
 
-# Add the handlers
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
-# Initialize OllamaHandler
-ollama_handler = OllamaHandler()
-
-# Main Bot
 class Azelia(commands.Bot):
     def __init__(self) -> None:
         super().__init__(
@@ -73,7 +65,8 @@ class Azelia(commands.Bot):
         )
         self.api_key = os.getenv('APIKEY')
         self.logger = logger
-    
+
+
     async def load_cogs(self) -> None:
         """
         Load bot modules
@@ -87,7 +80,8 @@ class Azelia(commands.Bot):
                 except Exception as e:
                     exception = f"{type(e).__name__}: {e}"
                     self.logger.error(f"Failed to load extension {extension}\n{exception}")
-                
+
+
     @tasks.loop(minutes=1.0)
     async def status_task(self) -> None:
         """
@@ -95,11 +89,10 @@ class Azelia(commands.Bot):
         """
         choices = config.fetch('status')
         await self.change_presence(activity=discord.Game(random.choice(choices)))
-    
     @status_task.before_loop
-    async def before_status_task(self) -> None:
-        await self.wait_until_ready()
+    async def before_status_task(self) -> None: await self.wait_until_ready()
     
+
     async def setup_hook(self) -> None:
         self.logger.info(f"Logged in as {self.user.name}")
         self.logger.info(f"discord.py API version: {discord.__version__}")
@@ -107,25 +100,14 @@ class Azelia(commands.Bot):
         self.logger.info(
             f"Running on: {platform.system()} {platform.release()} ({os.name})"
         )
-        self.logger.info("-------------------")
+
         await self.load_cogs()
         self.status_task.start()
-    
-    async def on_message(self, message: discord.Message) -> None:
-        if message.author == self.user or message.author.bot:
-            return
 
-        if message.content.startswith(config.fetch('prefix')):
-            await self.process_commands(message)
-        else: 
-            channel_id = config.fetch("channel_id")
-            if message.channel.id == channel_id:
-                await message.channel.typing()
-                logger.info(f"User: {message.content}")
-                response = ollama_handler.chat(message.content)
-                if response: 
-                    await message.channel.send(response)
-                    logger.info(f"Lilly: {response}")
+
+    async def on_message(self, message: discord.Message) -> None:
+        if message.author == self.user or message.author.bot: return
+        if message.content.startswith(config.fetch('prefix')): await self.process_commands(message)
 
 
 load_dotenv()
