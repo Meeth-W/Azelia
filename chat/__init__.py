@@ -26,7 +26,7 @@ class ChatView(discord.ui.View):
         self.chat_handler = chat_handler
         self.original_message_id = original_message_id
 
-    @discord.ui.button(label="🔁", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="🔁", style=discord.ButtonStyle.gray)
     async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
         if interaction.user.bot: return
 
@@ -42,15 +42,31 @@ class ChatView(discord.ui.View):
 
         user_input = old_entry['user_input']
         await self.chat_handler.regenerate(interaction.message, user_input)
+    
+    @discord.ui.button(label="🗑️", style=discord.ButtonStyle.red)
+    async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
+        if interaction.user.bot: return
+
+        await interaction.response.defer()
+
+        history = get_history()
+
+        if str(self.original_message_id) not in history['current']:
+            return await interaction.followup.send( "Unable to find the original message in history!", ephemeral=True )
+        history['current'].pop(str(self.original_message_id))
+        save_history(history)
+
+        await interaction.message.delete()
+        await interaction.channel.purge(limit=1)
 
     async def on_timeout(self):
         """
-        Automatically disables all buttons in the view after the timeout.
+        Automatically removes all buttons in the view after the timeout.
         """
         for child in self.children:
             if isinstance(child, discord.ui.Button): child.disabled = True
         
-        await self.message.edit(view=self)
+        await self.message.edit(view=None)
 
 
 def get_about() -> dict:
